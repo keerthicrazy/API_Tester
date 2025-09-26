@@ -1,0 +1,115 @@
+package com.ocbc.api.steps;
+        
+
+import io.cucumber.java.en.*;
+import io.restassured.response.Response;
+import org.testng.Assert;
+import org.json.simple.parser.ParseException;
+import org.ocbcqa.core.report.Logger;
+import org.ocbcqa.core.base.test.BaseStep;
+import org.ocbcqa.core.util.CustomSoftAssert;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import io.cucumber.datatable.DataTable;
+
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.When;
+import io.cucumber.java.en.Then;
+import static org.hamcrest.Matchers.*;
+import java.util.HashMap;
+
+import com.ocbc.api.service.PostUsersServiceService;
+import com.ocbc.api.service.PostUsersServiceService.PostUsersServiceRequest;
+import com.ocbc.api.service.PostUsersServiceService.PostUsersServiceResponse;
+
+public class PostUsersServiceSteps {
+
+    private static final Logger logger = LoggerFactory.getLogger(PostUsersServiceSteps.class);
+    private PostUsersServiceService postUsersServiceService = new PostUsersServiceService();
+    private PostUsersServiceRequest request;
+    private Response response;
+
+
+        @Given("I prepare a valid payload for POST with the following data: (.+)(.+)(.+)(.+)")
+     public void prepareValidPayload(String name, String username, Integer email, Integer age) {
+         request = PostUsersServiceRequest.builder()
+                 .name(name)
+                .username(username)
+                .email(email)
+                .age(age)
+                 .build();
+     }
+
+    @When("I send a POST request to body")
+    public void sendPOSTRequest() {
+        response = postUsersServiceService.post("accessToken123", request);
+        // Store response in service for schema validation
+        postUsersServiceService.setResponse(response);
+    }
+
+
+
+
+    @Then("the user should get status code for users endpoint as {int}")
+    public void verifystatusCode(int expectedStatus) {
+        assertEquals(response.getStatusCode(), expectedStatus);
+    }
+
+    @Then("the user verify the success schema of the response returned as expected for users service endpoint")
+    public void verifySuccessSchema() {
+        users.serializeSuccessResponse();
+        users.validateSuccessResponseSchema();
+    }
+
+    @Then("the response should contain the correct users details")
+    public void validatePostUsersServiceDetails(String name) {
+        assertNotNull(response);
+        // Get response data from POJO for validation
+        PostUsersServiceResponseData responseData = postUsersServiceService.getResponseData();
+        assertNotNull(responseData, "Response data should not be null");
+                assertEquals(response.jsonPath().get("name"), name);
+    }
+
+    
+    @Then("the response should match the success response schema")
+    public void validateResponseSchema() {
+        // Validate response against generated POJO schema using service
+        postUsersServiceService.validateSuccessSchema();
+        logger.info("Response schema validation successful");
+    }
+    @Then("^the response status should be (.+)$")
+    public void validateResponseStatus(String expectedStatus) {
+        assertEquals(response.getStatusCode(), Integer.parseInt(expectedStatus));
+    }
+    @Then("^the response field (.+) should equals (.+)$")
+    public void validateResponseField(String fieldName, String expectedValue) {
+        // Get response data from POJO for validation
+        PostUsersServiceResponseData responseData = postUsersServiceService.getResponseData();
+        assertNotNull(responseData, "Response data should not be null");
+        
+        // Validate field value using POJO getter methods
+        switch (fieldName) {
+            case name:
+                assertEquals(responseData.getName(), expectedValue);
+                break;
+            case username:
+                assertEquals(responseData.getUsername(), expectedValue);
+                break;
+            case email:
+                assertEquals(responseData.getEmail(), expectedValue);
+                break;
+            case age:
+                assertEquals(responseData.getAge(), expectedValue);
+                break;
+            case id:
+                assertEquals(responseData.getId(), expectedValue);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown field: " + fieldName);
+        }
+    }
+
+
+}

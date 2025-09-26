@@ -1,0 +1,1050 @@
+openapi: 3.0.3
+info:
+  title: ReqRes API - Enhanced for BDD Testing
+  description: |
+    A comprehensive fake API for testing and prototyping BDD code generation.
+    This API provides realistic data for users, resources, and authentication scenarios.
+    
+    **Enhanced Features for BDD Testing:**
+    - Complete schema definitions for all endpoints
+    - Comprehensive request/response examples
+    - Error response schemas for negative testing
+    - Type-safe POJO generation
+    - Schema validation support
+    
+    **Base URL:** https://reqres.in/api
+    **API Key:** x-api-key: reqres-free-v1
+    
+    **Perfect for testing:**
+    - Schema auto-population in Collection Testing
+    - OpenAPI schema extraction
+    - Response POJO generation
+    - Error scenario testing
+    - Type-safe validation
+  
+  version: 2.0.0
+  contact:
+    name: ReqRes API
+    url: https://reqres.in
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://reqres.in/api
+    description: Production server
+  - url: https://reqres.in/api
+    description: Development server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /users:
+    get:
+      summary: List users
+      description: |
+        Gets all users with pagination. Use this to show user lists in admin panels or user management screens.
+        
+        page: which page to show (default: 1)
+        per_page: how many users per page (max 12)
+        delay: add delay for testing (1-10 seconds)
+      operationId: listUsers
+      tags:
+        - Users
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+            example: 1
+        - name: per_page
+          in: query
+          description: Number of users per page
+          required: false
+          schema:
+            type: integer
+            default: 6
+            minimum: 1
+            maximum: 12
+            example: 6
+        - name: delay
+          in: query
+          description: Delay response by specified seconds (for testing)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            example: 2
+      responses:
+        '200':
+          description: Successful response with user list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+              examples:
+                default:
+                  summary: Default response
+                  value:
+                    page: 1
+                    per_page: 6
+                    total: 12
+                    total_pages: 2
+                    data:
+                      - id: 1
+                        email: "george.bluth@reqres.in"
+                        first_name: "George"
+                        last_name: "Bluth"
+                        avatar: "https://reqres.in/img/faces/1-image.jpg"
+                      - id: 2
+                        email: "janet.weaver@reqres.in"
+                        first_name: "Janet"
+                        last_name: "Weaver"
+                        avatar: "https://reqres.in/img/faces/2-image.jpg"
+                    support:
+                      url: "https://contentcaddy.io?utm_source=reqres&utm_medium=json&utm_campaign=referral"
+                      text: "Tired of writing endless social media content? Let Content Caddy generate it for you."
+        '400':
+          description: Bad request - invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_page:
+                  summary: Invalid page number
+                  value:
+                    error: "Page number must be greater than 0"
+                    statusCode: 400
+                    details: "Invalid pagination parameters"
+    
+    post:
+      summary: Create user
+      description: |
+        Creates a new user. Use for sign-up forms, admin creating users, or any user registration.
+        
+        Required: name, job
+        Optional: email, age, skills, address
+        
+        Returns the new user with ID and creation time.
+      operationId: createUser
+      tags:
+        - Users
+      requestBody:
+        required: true
+        description: User creation data with comprehensive fields
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+            examples:
+              comprehensive:
+                summary: Comprehensive user data
+                value:
+                  name: "John Doe"
+                  job: "Software Engineer"
+                  email: "john.doe@example.com"
+                  age: 30
+                  skills: ["JavaScript", "React", "Node.js"]
+                  address:
+                    street: "123 Main St"
+                    city: "New York"
+                    zipCode: "10001"
+              simple:
+                summary: Simple user data (minimum required)
+                value:
+                  name: "Jane Smith"
+                  job: "Designer"
+              developer:
+                summary: Developer profile
+                value:
+                  name: "Alex Johnson"
+                  job: "Full Stack Developer"
+                  email: "alex.johnson@tech.com"
+                  age: 28
+                  skills: ["Python", "Django", "Vue.js", "PostgreSQL"]
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateUserResponse'
+              examples:
+                default:
+                  summary: Default response
+                  value:
+                    name: "John Doe"
+                    job: "Software Engineer"
+                    id: "243"
+                    createdAt: "2025-01-15T12:09:05.255Z"
+                developer:
+                  summary: Developer user created
+                  value:
+                    name: "Alex Johnson"
+                    job: "Full Stack Developer"
+                    id: "244"
+                    createdAt: "2025-01-15T12:10:30.123Z"
+        '400':
+          description: Bad request - validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                missing_name:
+                  summary: Missing required field
+                  value:
+                    error: "Validation failed"
+                    statusCode: 400
+                    details: "Name field is required"
+                    field: "name"
+                invalid_email:
+                  summary: Invalid email format
+                  value:
+                    error: "Validation failed"
+                    statusCode: 400
+                    details: "Invalid email format"
+                    field: "email"
+
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      description: |
+        Gets a specific user by their ID. Use for user profile pages, edit forms, or showing user details.
+        
+        id: the user ID in the URL path
+        Returns the complete user profile with avatar and contact info.
+      operationId: getUserById
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          description: User ID (must be positive integer)
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful response with user data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SingleUserResponse'
+              examples:
+                user_found:
+                  summary: User found
+                  value:
+                    data:
+                      id: 1
+                      email: "george.bluth@reqres.in"
+                      first_name: "George"
+                      last_name: "Bluth"
+                      avatar: "https://reqres.in/img/faces/1-image.jpg"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                user_not_found:
+                  summary: User not found
+                  value:
+                    error: "User not found"
+                    statusCode: 404
+                    details: "No user exists with the specified ID"
+    
+    put:
+      summary: Update user (full update)
+      description: |
+        Completely replaces all user info. Use when you want to update everything.
+        
+        Warning: missing fields become null, so send all data.
+        Good for admin panels or when you want to reset user data.
+        
+        id: user ID in URL path
+        Body: send complete user data
+        Returns updated user with timestamp.
+      operationId: updateUser
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          description: User ID to update
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            example: 1
+      requestBody:
+        required: true
+        description: Complete user data for update
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+            examples:
+              full_update:
+                summary: Full user update
+                value:
+                  name: "George Bluth Updated"
+                  job: "Senior Manager"
+                  email: "george.updated@reqres.in"
+                  age: 35
+                  skills: ["Leadership", "Management", "Strategy"]
+                  address:
+                    street: "456 Business Ave"
+                    city: "Corporate City"
+                    zipCode: "20001"
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateUserResponse'
+              examples:
+                updated:
+                  summary: User updated
+                  value:
+                    name: "George Bluth Updated"
+                    job: "Senior Manager"
+                    updatedAt: "2025-01-15T12:15:45.789Z"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                user_not_found:
+                  summary: User not found for update
+                  value:
+                    error: "User not found"
+                    statusCode: 404
+                    details: "Cannot update non-existent user"
+    
+    patch:
+      summary: Partial update user
+      description: |
+        Updates only the fields you send. Other fields stay the same.
+        
+        Perfect for forms where user only changes some info.
+        Good for profile updates or incremental changes.
+        
+        id: user ID in URL path
+        Body: only send the fields you want to change
+        Returns updated user with timestamp.
+      operationId: partialUpdateUser
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          description: User ID to partially update
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            example: 1
+      requestBody:
+        required: true
+        description: Partial user data for update
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartialUpdateUserRequest'
+            examples:
+              partial_update:
+                summary: Partial update
+                value:
+                  job: "Team Lead"
+                  skills: ["Leadership", "JavaScript"]
+              name_only:
+                summary: Name update only
+                value:
+                  name: "George Bluth Jr."
+      responses:
+        '200':
+          description: User partially updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateUserResponse'
+              examples:
+                partial_updated:
+                  summary: Partial update successful
+                  value:
+                    name: "George Bluth Jr."
+                    job: "Team Lead"
+                    updatedAt: "2025-01-15T12:20:15.456Z"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    delete:
+      summary: Delete user
+      description: |
+        Removes a user from the system. Use for admin panels or user cleanup.
+        
+        id: user ID in URL path
+        Returns 204 (no content) on success.
+      operationId: deleteUser
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          description: User ID to delete
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            example: 1
+      responses:
+        '204':
+          description: User deleted successfully
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                user_not_found:
+                  summary: User not found for deletion
+                  value:
+                    error: "User not found"
+                    statusCode: 404
+                    details: "Cannot delete non-existent user"
+
+  /unknown:
+    get:
+      summary: List resources (colors)
+      description: |
+        Gets a list of color resources. Use for color pickers, design tools, or resource management.
+        
+        Returns colors with year, hex values, and pantone codes.
+      operationId: listResources
+      tags:
+        - Resources
+      responses:
+        '200':
+          description: Successful response with resource list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceListResponse'
+              examples:
+                colors:
+                  summary: Color resources
+                  value:
+                    page: 1
+                    per_page: 6
+                    total: 12
+                    total_pages: 2
+                    data:
+                      - id: 1
+                        name: "cerulean"
+                        year: 2000
+                        color: "#98B2D1"
+                        pantone_value: "15-4020"
+                      - id: 2
+                        name: "fuchsia rose"
+                        year: 2001
+                        color: "#C74375"
+                        pantone_value: "17-2031"
+
+  /unknown/{id}:
+    get:
+      summary: Get resource by ID
+      description: |
+        Gets a specific color resource by ID. Use for showing color details or color info pages.
+        
+        id: resource ID in URL path
+        Returns color details with hex value and pantone code.
+      operationId: getResourceById
+      tags:
+        - Resources
+      parameters:
+        - name: id
+          in: path
+          description: Resource ID
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful response with resource data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SingleResourceResponse'
+              examples:
+                color_found:
+                  summary: Color resource found
+                  value:
+                    data:
+                      id: 1
+                      name: "cerulean"
+                      year: 2000
+                      color: "#98B2D1"
+                      pantone_value: "15-4020"
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                resource_not_found:
+                  summary: Resource not found
+                  value:
+                    error: "Resource not found"
+                    statusCode: 404
+                    details: "No resource exists with the specified ID"
+
+  /register:
+    post:
+      summary: Register user
+      description: |
+        Creates a new user account. Use for sign-up forms and user registration.
+        
+        Required: email, password
+        Returns user ID and authentication token.
+      operationId: registerUser
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        description: User registration credentials
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              successful:
+                summary: Successful registration
+                value:
+                  email: "eve.holt@reqres.in"
+                  password: "pistol"
+              unsuccessful:
+                summary: Unsuccessful registration
+                value:
+                  email: "sydney@fife"
+      responses:
+        '200':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+              examples:
+                registered:
+                  summary: User registered
+                  value:
+                    id: 4
+                    token: "QpwL5tke4Pnpja7X4"
+        '400':
+          description: Registration failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                invalid_email:
+                  summary: Invalid email format
+                  value:
+                    error: "Registration failed"
+                    statusCode: 400
+                    details: "Invalid email format provided"
+                    field: "email"
+
+  /login:
+    post:
+      summary: Login user
+      description: |
+        Authenticates user and returns a token. Use for login forms and user authentication.
+        
+        Required: email, password
+        Returns authentication token for accessing protected resources.
+      operationId: loginUser
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        description: User login credentials
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              successful:
+                summary: Successful login
+                value:
+                  email: "eve.holt@reqres.in"
+                  password: "cityslicka"
+              unsuccessful:
+                summary: Unsuccessful login
+                value:
+                  email: "peter@klaven"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              examples:
+                logged_in:
+                  summary: User logged in
+                  value:
+                    token: "QpwL5tke4Pnpja7X4"
+        '400':
+          description: Login failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                invalid_credentials:
+                  summary: Invalid credentials
+                  value:
+                    error: "Login failed"
+                    statusCode: 400
+                    details: "Invalid email or password"
+                    field: "credentials"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: "API key for authentication (use: reqres-free-v1)"
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique user identifier
+          example: 1
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "george.bluth@reqres.in"
+        first_name:
+          type: string
+          description: User's first name
+          example: "George"
+        last_name:
+          type: string
+          description: User's last name
+          example: "Bluth"
+        avatar:
+          type: string
+          format: uri
+          description: URL to user's avatar image
+          example: "https://reqres.in/img/faces/1-image.jpg"
+      required:
+        - id
+        - email
+        - first_name
+        - last_name
+
+    UserListResponse:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        per_page:
+          type: integer
+          description: Number of users per page
+          example: 6
+        total:
+          type: integer
+          description: Total number of users
+          example: 12
+        total_pages:
+          type: integer
+          description: Total number of pages
+          example: 2
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+          description: Array of user objects
+        support:
+          type: object
+          properties:
+            url:
+              type: string
+              format: uri
+              description: Support URL
+              example: "https://contentcaddy.io?utm_source=reqres&utm_medium=json&utm_campaign=referral"
+            text:
+              type: string
+              description: Support message
+              example: "Tired of writing endless social media content? Let Content Caddy generate it for you."
+          description: Support information
+      required:
+        - page
+        - per_page
+        - total
+        - total_pages
+        - data
+
+    SingleUserResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+          description: Single user data
+      required:
+        - data
+
+    CreateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: User's full name
+          example: "John Doe"
+          minLength: 1
+          maxLength: 100
+        job:
+          type: string
+          description: User's job title
+          example: "Software Engineer"
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "john.doe@example.com"
+        age:
+          type: integer
+          description: User's age
+          minimum: 0
+          maximum: 150
+          example: 30
+        skills:
+          type: array
+          items:
+            type: string
+          description: User's skills
+          example: ["JavaScript", "React", "Node.js"]
+        address:
+          type: object
+          properties:
+            street:
+              type: string
+              description: Street address
+              example: "123 Main St"
+            city:
+              type: string
+              description: City name
+              example: "New York"
+            zipCode:
+              type: string
+              description: ZIP/Postal code
+              example: "10001"
+          description: User's address information
+      required:
+        - name
+        - job
+
+    CreateUserResponse:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Created user's name
+          example: "John Doe"
+        job:
+          type: string
+          description: Created user's job
+          example: "Software Engineer"
+        id:
+          type: string
+          description: Generated user ID
+          example: "243"
+        createdAt:
+          type: string
+          format: date-time
+          description: User creation timestamp
+          example: "2025-01-15T12:09:05.255Z"
+      required:
+        - name
+        - job
+        - id
+        - createdAt
+
+    UpdateUserRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateUserRequest'
+        - type: object
+          description: Full user update request (all fields required)
+
+    PartialUpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: User's full name
+          minLength: 1
+          maxLength: 100
+        job:
+          type: string
+          description: User's job title
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          description: User's email address
+        age:
+          type: integer
+          description: User's age
+          minimum: 0
+          maximum: 150
+        skills:
+          type: array
+          items:
+            type: string
+          description: User's skills
+        address:
+          type: object
+          properties:
+            street:
+              type: string
+              description: Street address
+            city:
+              type: string
+              description: City name
+            zipCode:
+              type: string
+              description: ZIP/Postal code
+          description: User's address information
+      description: Partial user update request (all fields optional)
+
+    UpdateUserResponse:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Updated user's name
+          example: "John Doe Updated"
+        job:
+          type: string
+          description: Updated user's job
+          example: "Senior Software Engineer"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2025-01-15T12:15:45.789Z"
+      required:
+        - name
+        - job
+        - updatedAt
+
+    Resource:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique resource identifier
+          example: 1
+        name:
+          type: string
+          description: Resource name
+          example: "cerulean"
+        year:
+          type: integer
+          description: Year of creation
+          example: 2000
+        color:
+          type: string
+          description: Color value in hex format
+          example: "#98B2D1"
+        pantone_value:
+          type: string
+          description: Pantone color reference
+          example: "15-4020"
+      required:
+        - id
+        - name
+        - year
+        - color
+        - pantone_value
+
+    ResourceListResponse:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        per_page:
+          type: integer
+          description: Number of resources per page
+          example: 6
+        total:
+          type: integer
+          description: Total number of resources
+          example: 12
+        total_pages:
+          type: integer
+          description: Total number of pages
+          example: 2
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Resource'
+          description: Array of resource objects
+      required:
+        - page
+        - per_page
+        - total
+        - total_pages
+        - data
+
+    SingleResourceResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Resource'
+          description: Single resource data
+      required:
+        - data
+
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address for registration
+          example: "eve.holt@reqres.in"
+        password:
+          type: string
+          description: User's password for registration
+          example: "pistol"
+          minLength: 6
+      required:
+        - email
+        - password
+
+    RegisterResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Generated user ID
+          example: 4
+        token:
+          type: string
+          description: Authentication token
+          example: "QpwL5tke4Pnpja7X4"
+      required:
+        - id
+        - token
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address for login
+          example: "eve.holt@reqres.in"
+        password:
+          type: string
+          description: User's password for login
+          example: "cityslicka"
+      required:
+        - email
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Authentication token
+          example: "QpwL5tke4Pnpja7X4"
+      required:
+        - token
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "User not found"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 404
+        details:
+          type: string
+          description: Additional error details
+          example: "No user exists with the specified ID"
+      required:
+        - error
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Validation error message
+          example: "Validation failed"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        details:
+          type: string
+          description: Validation error details
+          example: "Required field is missing"
+        field:
+          type: string
+          description: Field that failed validation
+          example: "name"
+      required:
+        - error
+        - statusCode
+        - details
+
+tags:
+  - name: Users
+    description: User management operations (CRUD)
+  - name: Resources
+    description: Resource management operations
+  - name: Authentication
+    description: User authentication operations (login/register)

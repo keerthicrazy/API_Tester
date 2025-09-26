@@ -1,0 +1,21 @@
+# Frontend Dockerfile
+FROM nexus.ocbc.com:8443/node:18-alpine
+
+WORKDIR /app
+
+# Copy package files and install dependencies (including dev dependencies for Vite)
+COPY frontend/package*.json ./frontend/
+RUN cd frontend && npm ci --registry=https://nexus.ocbc.com:8443/repository/OCBC_NPM/ --strict-ssl=false
+
+# Copy source code
+COPY frontend/ ./frontend/
+
+WORKDIR /app/frontend
+
+# Expose ports
+EXPOSE 8080
+EXPOSE 4173
+
+# Start dev server
+CMD ["npm", "run", "dev"]
+

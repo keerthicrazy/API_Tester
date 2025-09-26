@@ -1,0 +1,262 @@
+
+openapi: 3.0.1
+info:
+  title: Sample E-commerce API
+  description: A sample API for testing API automation tools with common e-commerce endpoints
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: https://jsonplaceholder.typicode.com
+    description: Test server
+  - url: https://www.reddit.com
+    description: Reddit API (CORS testing)
+
+paths:
+  /users:
+    get:
+      summary: Get all users
+      description: Retrieve a list of all users
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+    post:
+      summary: Create a new user
+      description: Create a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUser'
+            example:
+              name: John Doe
+              email: john@example.com
+              username: johndoe
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      description: Retrieve a specific user by their ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+    put:
+      summary: Update user
+      description: Update an existing user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Bearer token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUser'
+            example:
+              name: Jane Doe
+              email: jane@example.com
+      responses:
+        '200':
+          description: User updated successfully
+
+  /posts:
+    get:
+      summary: Get all posts
+      description: Retrieve all blog posts
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: integer
+          description: Filter posts by user ID
+      responses:
+        '200':
+          description: Posts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+
+  /r/javascript.json:
+    get:
+      summary: Get JavaScript subreddit posts
+      description: Retrieve posts from r/javascript subreddit (CORS testing endpoint)
+      tags:
+        - CORS Testing
+      responses:
+        '200':
+          description: Reddit posts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      children:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            data:
+                              type: object
+                              properties:
+                                title:
+                                  type: string
+                                author:
+                                  type: string
+                                score:
+                                  type: integer
+                                num_comments:
+                                  type: integer
+                                created_utc:
+                                  type: number
+        '403':
+          description: CORS error - Access blocked by browser
+        '429':
+          description: Rate limited by Reddit
+
+  /api/v1/random:
+    get:
+      summary: Random data endpoint (CORS testing)
+      description: A simple endpoint that returns random data for CORS testing
+      tags:
+        - CORS Testing
+      responses:
+        '200':
+          description: Random data retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  value:
+                    type: number
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/test-cors:
+    get:
+      summary: CORS test endpoint
+      description: Endpoint specifically designed to test CORS handling
+      tags:
+        - CORS Testing
+      responses:
+        '200':
+          description: CORS test successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  cors_enabled:
+                    type: boolean
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        address:
+          type: object
+          properties:
+            street:
+              type: string
+            city:
+              type: string
+            zipcode:
+              type: string
+
+    CreateUser:
+      type: object
+      required:
+        - name
+        - email
+        - username
+      properties:
+        name:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+
+    UpdateUser:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        body:
+          type: string
+        userId:
+          type: integer
