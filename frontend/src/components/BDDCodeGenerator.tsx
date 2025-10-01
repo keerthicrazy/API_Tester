@@ -26,11 +26,11 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
   const [generatedCode, setGeneratedCode] = useState<GeneratedCode | null>(null);  // The generated BDD code
   const [isGenerating, setIsGenerating] = useState(false);                         // Loading state while generating
   const [copyStates, setCopyStates] = useState<Record<string, boolean>>({});      // Which copy buttons are clicked
-  
+
   // State for request body field customization
   const [customizableFields, setCustomizableFields] = useState<Record<string, Set<string>>>({});  // Which fields can be customized
   const [showFieldConfig, setShowFieldConfig] = useState(false);                                 // Show field configuration modal
-  
+
   // State for error schema configuration
   const [showErrorSchema, setShowErrorSchema] = useState(false);                                 // Show error schema modal
   const [errorSchema, setErrorSchema] = useState<{
@@ -43,8 +43,6 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
     enabled: false
   });
   
-
-  
   // Configuration for code generation
   const [config, setConfig] = useState({
     basePackage: 'com.ocbc.api',    // Java package name
@@ -56,6 +54,31 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
     generateFeatureFiles: true,      // Create Gherkin feature files
   });
   const { toast } = useToast();
+
+  const flattenObject = (obj, parentKey = "", result = {}) => {
+    for (let key in obj) {
+      if (!obj.hasOwnProperty(key)) continue;
+
+      const newKey = parentKey ? `${parentKey}.${key}` : key;
+
+      if (typeof obj[key] === "object" && obj[key] !== null && !Array.isArray(obj[key])) {
+        flattenObject(obj[key], newKey, result); // recurse for nested objects
+      } else if (Array.isArray(obj[key])) {
+        obj[key].forEach((item, index) => {
+          if (typeof item === "object") {
+            flattenObject(item, `${newKey}[${index}]`, result);
+          } else {
+            result[`${newKey}[${index}]`] = item;
+          }
+        });
+      } else {
+        result[newKey] = obj[key];
+      }
+    }
+    return result;
+  }
+
+
 
   // Copies generated code to clipboard with visual feedback
   const copyToClipboard = async (text: string, fileName: string, buttonId?: string) => {
@@ -82,7 +105,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        
+
         try {
           const successful = document.execCommand('copy');
           if (successful) {
@@ -168,7 +191,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
       const endpointsWithCustomFields = endpoints.map(endpoint => {
         const endpointKey = `${endpoint.method}-${endpoint.path}`;
         const customFields = customizableFields[endpointKey];
-        
+
         return {
           ...endpoint,
           customizableFields: customFields || new Set(),
@@ -186,7 +209,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
         basePackage: config.basePackage
       });
       setGeneratedCode(code);
-      
+
       toast({
         title: "OCBC BDD Code Generated",
         description: `Generated ${code.featureFiles.length} feature files, ${code.stepDefinitions.length} step definitions, ${code.serviceClasses.length} service classes with embedded POJOs.`,
@@ -212,7 +235,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
     ];
 
     const zip = new JSZip();
-    
+
     // Add feature files to features folder
     generatedCode.featureFiles.forEach(file => {
       zip.file(`src/test/resources/features/${file.name}`, file.content);
@@ -262,40 +285,38 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
               <Settings className="h-4 w-4" />
               <h3 className="text-sm font-medium">Package Configuration</h3>
             </div>
-            
+
             {/* Configure Request Fields Button - Always visible */}
             <div className="flex items-center gap-2">
               <Button
                 variant={Object.keys(customizableFields).length > 0 ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowFieldConfig(true)}
-                className={`flex items-center space-x-1 ${
-                  Object.keys(customizableFields).length > 0 
-                    ? "bg-green-600 hover:bg-green-700 text-white" 
-                    : ""
-                }`}
+                className={`flex items-center space-x-1 ${Object.keys(customizableFields).length > 0
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : ""
+                  }`}
               >
                 <Database className="w-3 h-3" />
                 <span>Configure Request Fields</span>
               </Button>
-              
+
               {/* Error Schema Button */}
               <Button
                 variant={errorSchema.enabled ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowErrorSchema(true)}
-                className={`flex items-center space-x-1 ${
-                  errorSchema.enabled 
-                    ? "bg-green-600 hover:bg-green-700 text-white" 
-                    : ""
-                }`}
+                className={`flex items-center space-x-1 ${errorSchema.enabled
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : ""
+                  }`}
               >
                 <AlertTriangle className="w-3 h-3" />
                 <span>Error Schema</span>
               </Button>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="basePackage">Base Package</Label>
@@ -306,7 +327,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                 placeholder="com.ocbc.api"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="endpointName">Endpoint Name</Label>
               <Input
@@ -331,7 +352,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
               <Database className="h-4 w-4" />
               <h3 className="text-sm font-medium">Field Configuration</h3>
             </div>
-            
+
             <div className="p-3 border rounded-lg bg-gray-50">
               <div className="text-xs text-muted-foreground text-center">
                 <p className="mb-1">No field configuration set yet.</p>
@@ -348,7 +369,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
 
         {/* Generate Button */}
         <div className="flex items-center gap-2">
-          <Button 
+          <Button
             onClick={handleGenerateCode}
             disabled={isGenerating}
             className="flex items-center gap-2"
@@ -365,10 +386,10 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
               </>
             )}
           </Button>
-          
+
           {generatedCode && (
             <>
-              <Button 
+              <Button
                 onClick={handleDownloadAll}
                 variant="outline"
                 className="flex items-center gap-2"
@@ -516,7 +537,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                 You can configure fields for common API patterns or specific endpoints.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-6">
               {/* Actual Endpoints Section */}
               {endpoints.some(endpoint => ['POST', 'PUT', 'PATCH'].includes(endpoint.method.toUpperCase())) && (
@@ -525,21 +546,24 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                     <Database className="h-4 w-4" />
                     <h3 className="text-sm font-medium">Actual Endpoints</h3>
                   </div>
-                  
+
                   {endpoints.map((endpoint, index) => {
                     if (!['POST', 'PUT', 'PATCH'].includes(endpoint.method.toUpperCase())) return null;
-                    
-                    const requestFields = endpoint.requestBody ? Object.keys(endpoint.requestBody) : [];
-                    
+
+                    const flattenedFields = endpoint.requestBody ? flattenObject(endpoint.requestBody) : {};
+
+                    console.log("Flattern Request Fields :: ", JSON.stringify(flattenedFields));
+                    console.log("Flattern Request Fields Length:: ", Object.keys(flattenedFields).length);
+
                     return (
                       <div key={index} className="space-y-3 p-4 border rounded-lg">
                         <div className="font-medium text-sm">
                           {endpoint.method.toUpperCase()} {endpoint.path}
                         </div>
-                        
-                        {requestFields.length > 0 ? (
+
+                        {Object.keys(flattenedFields).length > 0 ? (
                           <div className="space-y-2">
-                            {requestFields.map(field => (
+                            {Object.entries(flattenedFields).map(([field, value]) => (
                               <div key={field} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
                                 <div className="flex items-center space-x-3">
                                   <Checkbox
@@ -550,13 +574,12 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                                     })()}
                                     onCheckedChange={(checked) => {
                                       const endpointKey = `${endpoint.method}-${endpoint.path}`;
-                                      
                                       setCustomizableFields(prev => {
+                                        
                                         const newFields = { ...prev };
                                         if (!newFields[endpointKey]) {
                                           newFields[endpointKey] = new Set();
                                         }
-                                        
                                         if (checked) {
                                           newFields[endpointKey].add(field);
                                         } else {
@@ -567,19 +590,17 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                                       });
                                     }}
                                   />
-                                  <Label 
-                                    htmlFor={`${endpoint.method}-${endpoint.path}-${field}`} 
+                                  <Label
+                                    htmlFor={`${endpoint.method}-${endpoint.path}-${field}`}
                                     className="text-sm font-medium"
                                   >
                                     {field}
                                   </Label>
                                   <span className="text-xs text-gray-500">
-                                    Default: {typeof endpoint.requestBody[field] === 'object' 
-                                      ? JSON.stringify(endpoint.requestBody[field]) 
-                                      : endpoint.requestBody[field]}
+                                    Default: {value !== null ? String(value) : ""}
                                   </span>
                                 </div>
-                                
+
                                 <Badge variant={(() => {
                                   const endpointKey = `${endpoint.method}-${endpoint.path}`;
                                   return customizableFields[endpointKey]?.has(field) ? "default" : "secondary";
@@ -613,7 +634,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                 </div>
               )}
             </div>
-            
+
             <DialogFooter>
               <Button variant="outline" onClick={resetAllFields}>
                 Reset All
@@ -638,7 +659,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                 This will create comprehensive BDD tests covering both positive and negative cases.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-6">
               {/* Error Schema Configuration */}
               <div className="space-y-4">
@@ -646,7 +667,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                   <AlertTriangle className="h-4 w-4" />
                   <h3 className="text-sm font-medium">Error Response Configuration</h3>
                 </div>
-                
+
                 <div className="grid grid-cols-1 gap-4">
                   {/* Enable Error Schema */}
                   <div className="flex items-center space-x-3">
@@ -661,7 +682,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                       Enable Error Schema Validation
                     </Label>
                   </div>
-                  
+
                   {/* Error Status Code */}
                   <div className="space-y-2">
                     <Label htmlFor="error-status-code">Expected Error Status Code</Label>
@@ -676,7 +697,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                       Common error codes: 400 (Bad Request), 401 (Unauthorized), 422 (Validation Error)
                     </div>
                   </div>
-                  
+
                   {/* Error Response Structure */}
                   <div className="space-y-2">
                     <Label htmlFor="error-structure">Error Response Structure (JSON)</Label>
@@ -699,11 +720,11 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                       Define the expected error response structure. This will be used to generate error POJOs and validation steps.
                     </div>
                   </div>
-                  
+
 
                 </div>
               </div>
-              
+
               {/* Preview Section */}
               {errorSchema.enabled && (
                 <div className="space-y-4">
@@ -711,7 +732,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                     <Code className="h-4 w-4" />
                     <h3 className="text-sm font-medium">Generated Error Test Preview</h3>
                   </div>
-                  
+
                   <div className="p-3 border rounded-lg bg-red-50">
                     <div className="text-xs text-red-800">
                       <strong>Error Test Scenario:</strong>
@@ -724,7 +745,7 @@ export const BDDCodeGenerator: React.FC<BDDCodeGeneratorProps> = ({ endpoints })
                 </div>
               )}
             </div>
-            
+
             <DialogFooter>
               <Button variant="outline" onClick={() => {
                 setErrorSchema({

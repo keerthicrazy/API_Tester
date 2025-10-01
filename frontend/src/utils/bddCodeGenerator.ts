@@ -242,7 +242,7 @@ public static class ${pojoClassName} {
             // Use original logic for backward compatibility
             for (const [fieldName, value] of Object.entries(responseData)) {
                 const javaFieldName = this.generateJavaFieldName(fieldName);
-                const fieldType = this.getJavaTypeForValue(value, fieldName, className);
+                const fieldType = this.getJavaTypeForValue(value, fieldName, className, false);
                 pojoContent += `        @JsonProperty(required = true)
         private ${fieldType} ${javaFieldName};
 `;
@@ -252,7 +252,7 @@ public static class ${pojoClassName} {
         pojoContent += `    }`;
 
         // Generate nested POJOs for complex fields
-        const nestedPOJOs = this.generateNestedPOJOs(responseData, detectedSchema, className);
+        const nestedPOJOs = this.generateNestedPOJOs(endpoint.actualResponse?.data, detectedSchema, className, false);
         if (nestedPOJOs) {
             pojoContent += `\n${nestedPOJOs}`;
         }
@@ -260,7 +260,7 @@ public static class ${pojoClassName} {
         return pojoContent;
     }
 
-    private getJavaTypeForValue(value: any, fieldName: string = '', className: string = ''): string {
+    private getJavaTypeForValue(value: any, fieldName: string = '', className: string = '', errorClass: Boolean = false): string {
         if (Array.isArray(value) && value.length > 0) {
             const firstItem = value[0];
             if (typeof firstItem === 'object' && firstItem !== null) {
@@ -272,7 +272,7 @@ public static class ${pojoClassName} {
         }
         if (typeof value === 'object' && value !== null) {
             // For complex objects, generate a class name based on field name and class
-            const objectClassName = this.generateObjectClassName(fieldName, className);
+            const objectClassName = this.generateObjectClassName(fieldName, className, errorClass);
             return objectClassName;
         }
         return this.getJavaType(typeof value);
@@ -286,22 +286,28 @@ public static class ${pojoClassName} {
         return `${className}${fieldPascalCase}`;
     }
 
-    private generateObjectClassName(fieldName: string, className: string): string {
-        if (!fieldName) return `${className}Data`;
+    private generateObjectClassName(fieldName: string, className: string, errorClass: Boolean): string {
+
+        let errClassName = errorClass === true ? 'Error' : '';
+        if (!fieldName) return `${errClassName + className}Data`;
 
         // Convert field name to PascalCase and append to class name
         const fieldPascalCase = this.sanitizeClassName(fieldName);
-        return `${className}${fieldPascalCase}`;
+        return `${errClassName + className}${fieldPascalCase}`;
     }
 
-    private generateNestedPOJOs(responseData: any, detectedSchema: any, className: string): string {
+    private generateNestedPOJOs(responseData: any, detectedSchema: any, className: string, errorClass: Boolean): string {
+
         let nestedPOJOs = '';
+        let errClassName = errorClass === true ? 'Error' : '';
 
         // Dynamically generate nested POJOs based on the actual data structure
         const processedFields = new Set<string>();
 
         const generateNestedClass = (data: any, fieldName: string, className: string, depth: number = 0): string => {
-            if (depth > 3) return ''; // Prevent infinite recursion
+
+            // Condition Removed
+            // if (depth > 4) return ''; // Prevent infinite recursion
 
             const classKey = `${className}_${fieldName}`;
             if (processedFields.has(classKey)) return '';
@@ -313,12 +319,12 @@ public static class ${pojoClassName} {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ${className}${this.sanitizeClassName(fieldName)} {`;
+    public static class ${errClassName + className}${this.sanitizeClassName(fieldName)} {`;
 
             // Generate fields for this nested class
             Object.entries(data).forEach(([key, value]) => {
                 const javaFieldName = this.generateJavaFieldName(key);
-                const fieldType = this.getJavaTypeForValue(value, key, className);
+                const fieldType = this.getJavaTypeForValue(value, key, className, errorClass);
 
                 classContent += `
         @JsonProperty(required = true)
@@ -340,6 +346,7 @@ public static class ${pojoClassName} {
 
         // Generate nested classes for complex fields in the main response
         Object.entries(responseData).forEach(([fieldName, value]) => {
+
             if (this.isComplexField(value)) {
                 nestedPOJOs += generateNestedClass(value, fieldName, className, 0);
             }
@@ -358,6 +365,9 @@ public static class ${pojoClassName} {
     private generateErrorPOJO(endpoint: Endpoint, className: string): string {
         const errorStructure = endpoint.errorSchema?.errorStructure || '';
 
+        console.log("Error Structure :: " + JSON.stringify(errorStructure));
+        console.log("Error Class Name :: " + className);
+
         const errorPojoClassName = `${className}ErrorData`;
         let errorPojoContent = `    // Error POJO for schema validation
     @Data
@@ -368,7 +378,7 @@ public static class ${pojoClassName} {
 `;
 
         // Parse error structure JSON and extract fields
-        let errorFields: Array<{ name: string; type: string }> = [];
+        let errorFields: Array<{ name: string; type: string, value: any }> = [];
         if (errorStructure.trim()) {
             try {
                 const parsedErrorStructure = JSON.parse(errorStructure);
@@ -376,31 +386,37 @@ public static class ${pojoClassName} {
             } catch (error) {
                 // If JSON parsing fails, create default error fields
                 errorFields = [
-                    { name: 'error', type: 'string' },
-                    { name: 'message', type: 'string' },
-                    { name: 'statusCode', type: 'string' }
+                    { name: 'error', type: 'string', value: "" },
+                    { name: 'message', type: 'string', value: "" },
+                    { name: 'statusCode', type: 'string', value: "" }
                 ];
             }
         } else {
             // Default error fields if no structure provided
             errorFields = [
-                { name: 'error', type: 'string' },
-                { name: 'message', type: 'string' },
-                { name: 'statusCode', type: 'string' }
+                { name: 'error', type: 'string', value: "" },
+                { name: 'message', type: 'string', value: "" },
+                { name: 'statusCode', type: 'string', value: "" }
             ];
         }
 
         // Add fields based on extracted error structure
         if (errorFields.length > 0) {
+
+            console.log("Error Fields :: " + JSON.stringify(errorFields));
+
             errorFields.forEach(field => {
+
                 const javaFieldName = this.generateJavaFieldName(field.name);
-                const fieldType = this.getJavaType(field.type);
-                // Default to required for error fields
-                const required = 'true';
-                errorPojoContent += `        @JsonProperty(required = ${required})
+                const fieldType = this.getJavaTypeForValue(field.value, field.name, className, true);
+
+                console.log("fieldTypeValue ::: " + fieldType);
+                errorPojoContent += `        @JsonProperty(required = true)
         private ${fieldType} ${javaFieldName};
 `;
             });
+
+
         } else {
             // Fallback to basic error fields
             errorPojoContent += `        @JsonProperty(required = true)
@@ -413,6 +429,12 @@ public static class ${pojoClassName} {
         }
 
         errorPojoContent += `    }`;
+
+        // Generate nested POJOs for complex fields
+        const nestedPOJOs = this.generateNestedPOJOs(JSON.parse(errorStructure), '', className, true);
+        if (nestedPOJOs) {
+            errorPojoContent += `\n${nestedPOJOs}`;
+        }
 
         return errorPojoContent;
     }
@@ -474,13 +496,14 @@ public static class ${pojoClassName} {
         const hasCustomizableFields = requiresBody && customizableFields.size > 0;
 
         // let scenario = method.toLocaleUpperCase() === 'GET' ? 'Scenatio' : 'Scenario Outline';
-    
+
+        console.log("Custom Field :: " + Array.from(customizableFields).map(field => `<${field}>`).join(''));
 
         let content = `Feature: ${description}
 
 Scenario Outline: Verify successful ${method} ${action} request to ${resource}
-Given the user send for ${method} request to ${resource} service endpoint ${hasCustomizableFields ? `${ Array.from(customizableFields).map(field => `<${field}>`).join('') }` : ''}` 
-   +`
+Given the user send for ${method} request to ${resource} service endpoint ${hasCustomizableFields ? `${Array.from(customizableFields).map(field => `<${field}>`).join('')}` : ''}`
+            + `
 Then the user should get status code for ${resource} endpoint as 200
 ${this.generateFeatureValidationSteps(endpoint)}
     Examples:
@@ -494,9 +517,9 @@ ${this.generateFeatureValidationSteps(endpoint)}
         if (endpoint.errorSchema?.enabled) {
 
             // extract selected data
-        const customizeData = this.generateCustomizeData(endpoint, responseData);
+            const customizeData = this.generateCustomizeData(endpoint, responseData);
 
-            
+
             content += `
 Scenario Outline: Verify error response for ${method} ${action} request to ${resource}
 ${requiresBody ? `    Given the user send ${method} request to ${resource} service end point
@@ -624,7 +647,7 @@ ${this.generateInvalidPayloadBuilder(endpoint)}
         const resource = this.getResourceFromPath(endpoint.path);
         const requestClass = `${className}Request`;
         const responseClass = `${className}Response`;
-        console.log("Value ====="+JSON.stringify(endpoint));        // Use OCBC enterprise framework with embedded POJOs
+        console.log("Value =====" + JSON.stringify(endpoint));        // Use OCBC enterprise framework with embedded POJOs
         return this.generateOCBCServiceClass(endpoint, className, method, resource, requestClass, responseClass);
     }
 
@@ -875,8 +898,8 @@ import lombok.AllArgsConstructor;` : '';
         @JsonProperty("${fieldName}")
         private ${fieldType} ${this.camelCase(fieldName)};`;
 
-        console.log("FieldType :: "+ fieldType);
-        console.log("FieldName :: "+ fieldName);
+            console.log("FieldType :: " + fieldType);
+            console.log("FieldName :: " + fieldName);
 
             return this.config.useLombok ?
                 `        private ${fieldType} ${this.camelCase(fieldName)};` :
@@ -934,7 +957,7 @@ ${fieldsCode}${gettersSetters}
         return null;
     }
 
-    private extractFields(data: any): Array<{ name: string; type: string }> {
+    private extractFields(data: any): Array<{ name: string; type: string; value: any }> {
         if (!data || typeof data !== 'object') {
             return [];
         }
@@ -942,6 +965,7 @@ ${fieldsCode}${gettersSetters}
         return Object.entries(data).map(([key, value]) => ({
             name: key,
             type: this.getJavaType(typeof value),
+            value: value
         }));
     }
 
@@ -1130,19 +1154,26 @@ ${fieldsCode}${gettersSetters}
             // Only include fields that are marked as customizable
             const customizableFields = endpoint.customizableFields || new Set();
 
-            Object.keys(endpoint.requestBody).forEach(field => {
-                // Only add to Examples if field is customizable
-                if (customizableFields.has(field)) {
-                    const fieldValue = endpoint.requestBody[field];
-                    if (typeof fieldValue === 'string') {
-                        exampleData[field] = fieldValue;
-                    } else if (typeof fieldValue === 'number') {
-                        exampleData[field] = fieldValue;
-                    } else if (typeof fieldValue === 'boolean') {
-                        exampleData[field] = fieldValue;
-                    } else {
-                        exampleData[field] = '""';
-                    }
+            // helper to safely get nested value by path
+            const getNested = (obj: any, keys: string[]) => {
+                let cur = obj;
+                for (const k of keys) {
+                    if (cur == null || !(k in cur)) return undefined;
+                    cur = cur[k];
+                }
+                return cur;
+            };
+
+            customizableFields.forEach(path => {
+                const keys = path.split('.');
+                const val = getNested(endpoint.requestBody, keys);
+                if (val === undefined) return; // skip missing paths
+
+                // keep primitives as-is, otherwise fallback to '""'
+                if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+                    exampleData[path] = val;
+                } else {
+                    exampleData[path] = '""';
                 }
             });
         }
@@ -1213,6 +1244,9 @@ ${fieldsCode}${gettersSetters}
     }
 
     private generateExampleValues(exampleData: any): string {
+
+        console.log("Example Data :: " + JSON.stringify(exampleData));
+
         return Object.entries(exampleData).map(([key, value]) => {
             if (typeof value === 'string') {
                 return `"${value}"`;
@@ -1285,7 +1319,7 @@ ${fieldsCode}${gettersSetters}
 
         return steps.join('\n');
     }
-    
+
 
     private generateValidationSteps(endpoint: Endpoint): string {
         let steps = '';
@@ -1366,22 +1400,14 @@ ${fieldsCode}${gettersSetters}
     @Then("^the response field (.+) should equals (.+)$")
     public void validateResponseField(String fieldName, String expectedValue) {
         // Get response data from POJO for validation
-        ${className}ResponseData responseData = ${this.camelCase(serviceClass)}.getResponseData();
-        assertNotNull(responseData, "Response data should not be null");
-        
-        // Validate field value using POJO getter methods
-        switch (fieldName) {
-            ${fields.map(field => {
-    return `case ${field}:
-                assertEquals(responseData.get${this.pojoMethodCase(field)}(), expectedValue);
-                break;
-            `
-        }).join('')}default:
-                throw new IllegalArgumentException("Unknown field: " + fieldName);
-        }
+        // ${className}ResponseData responseData = ${this.camelCase(serviceClass)}.getResponseData();
+        // assertNotNull(responseData, "Response data should not be null");
+
+            assertEquals(response.jsonPath().get(fieldName), expectedValue);
+             
     }`;
         }
-        
+
 
         if (usedSteps.has('field_not_empty')) {
             const className = this.generateClassName(endpoint);
@@ -1536,65 +1562,97 @@ ${fieldsCode}${gettersSetters}
                  .email("test@example.com")`;
     }
 
+    private capitalize(str: string): string {
+        if (!str) return str;
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    private generateBuilderCalls(
+        obj: any,
+        customizableFields: Set<string>,
+        parentKey: string = "",
+        indent: string = "            " // base indent for builder fields
+    ): string {
+        return Object.entries(obj).map(([key, value]) => {
+            const fullKey = parentKey ? `${parentKey}.${key}` : key;
+
+            // Handle arrays
+            if (Array.isArray(value)) {
+                const arrayItems = value.map((item: any) => {
+                    if (typeof item === "object") {
+                        // Nested object inside array
+                        return `${indent}    ${this.capitalize(key)}Item.builder()\n${this.generateBuilderCalls(item, customizableFields, fullKey, indent + "        ")}\n${indent}    .build()`;
+                    } else {
+                        return typeof item === "string" ? `"${item}"` : item;
+                    }
+                }).join(",\n" + indent + "    ");
+
+                return `${indent}.${key}(Arrays.asList(\n${arrayItems}\n${indent}))`;
+            }
+
+            // Handle nested objects
+            if (typeof value === "object" && value !== null) {
+                const nestedIndent = indent + "    ";
+                return `${indent}.${key}(${this.capitalize(key)}.builder()\n${this.generateBuilderCalls(value, customizableFields, fullKey, nestedIndent)}\n${indent}.build())`;
+            }
+
+            // Simple fields
+            if (customizableFields.has(fullKey)) {
+                const paramName = fullKey.replace(/\./g, "_");
+                return `${indent}.${key}(${paramName})`;
+            } else if (typeof value === "string") {
+                return `${indent}.${key}("${value}")`;
+            } else {
+                return `${indent}.${key}(${value})`;
+            }
+        }).join("\n");
+    }
+
     private generateDynamicRequestStep(endpoint: Endpoint, requestClass: string): string {
-        if (!endpoint.requestBody || Object.keys(endpoint.requestBody).length === 0) {
-            return '';
-        }
+        if (!endpoint.requestBody || Object.keys(endpoint.requestBody).length === 0) return '';
 
         const customizableFields = endpoint.customizableFields || new Set();
-        const allFields = Object.keys(endpoint.requestBody);
 
-        var regexFields = ''; 
-        
-        // Parameters for customizable fields only
-        const parameters = allFields
-            .filter(field => customizableFields.has(field))
-            .map(field => { 
-                regexFields +='(.+)'; 
-                return this.getJavaType(typeof endpoint.requestBody[field]) +` ${field}`;
-            })
-            .join(', ');
-             console.log("allfields-----"+JSON.stringify(allFields))
-                console.log("customizableFields-----"+JSON.stringify(customizableFields))
-            console.log("params-----"+JSON.stringify(parameters))
-
-        // Builder calls for all fields (customizable use parameters, others use defaults)
-        const builderCalls = allFields.map(field => {
-            if (customizableFields.has(field)) {
-                return `.${field}(${field})`; // Use parameter
-            } else {
-                // Use default value from request body
-                const defaultValue = endpoint.requestBody[field];
-                if (typeof defaultValue === 'string') {
-                    return `.${field}("${defaultValue}")`;
+        // Flatten keys for parameters
+        const flattenKeys = (obj: any, parent: string = ""): string[] => {
+            return Object.entries(obj).flatMap(([k, v]) => {
+                const fullKey = parent ? `${parent}.${k}` : k;
+                if (typeof v === "object" && v !== null && !Array.isArray(v)) {
+                    return flattenKeys(v, fullKey);
                 } else {
-                    return `.${field}(${defaultValue})`;
+                    return [fullKey];
                 }
-            }
-        }).join('\n                ');
+            });
+        };
 
-        // Always generate step for POST/PUT/PATCH requests, even if no customizable fields
-        if (customizableFields.size === 0) {
-            // No customizable fields - use all defaults
-            return `    @Given("I prepare a valid payload for ${endpoint.method}")
-     public void prepareValidPayload() {
-         request = ${requestClass}.builder()
-                 ${builderCalls}
-                 .build();
-     }
+        const allFields = flattenKeys(endpoint.requestBody);
+        const parameters = allFields
+            .filter(f => customizableFields.has(f))
+            .map(f => `String ${f.replace(/\./g, "_")}`)
+            .join(", ");
 
-`;
-        }
+        const regexFields = allFields
+            .filter(f => customizableFields.has(f))
+            .map(() => "(.+)")
+            .join("");
 
-        return `    @Given("I prepare a valid payload for ${endpoint.method} with the following data: ${regexFields}")
-     public void prepareValidPayload(${parameters}) {
-         request = ${requestClass}.builder()
-                 ${builderCalls}
-                 .build();
-     }
+        const builderCalls = this.generateBuilderCalls(endpoint.requestBody, customizableFields);
 
+        const methodLine = customizableFields.size === 0
+            ? `@Given("I prepare a valid payload for ${endpoint.method}")`
+            : `@Given("I prepare a valid payload for ${endpoint.method} with the following data: ${regexFields}")`;
+
+        const methodParams = customizableFields.size === 0 ? "" : `(${parameters})`;
+
+        return `${methodLine}
+public void prepareValidPayload${methodParams}() {
+    request = ${requestClass}.builder()
+${builderCalls}
+        .build();
+}
 `;
     }
+
 
     private generateInvalidPayloadParameters(endpoint: Endpoint): string {
         const parameters: string[] = [];
@@ -1947,7 +2005,7 @@ ${fieldsCode}${gettersSetters}
         }
         if (typeof value === 'object' && value !== null) {
             // Check if object has multiple properties
-            return Object.keys(value).length > 1;
+            return Object.keys(value).length > 0;
         }
         return false;
     }
