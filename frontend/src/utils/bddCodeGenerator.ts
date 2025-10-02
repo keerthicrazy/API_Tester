@@ -194,6 +194,49 @@ export class BDDCodeGenerator {
         return resource;
     }
 
+
+    /**
+     * Generate POJO class for Request schema
+     */
+    private generateRequestPOJO(requestData: any, className: string): string {
+        
+
+        if (!requestData || Object.keys(requestData).length === 0) {
+            return '';
+        }
+
+        const pojoClassName = `${className}RequestData`;
+        let pojoContent = `    // RequestData POJO for schema validation
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ${pojoClassName} {
+`;
+
+        
+            // Use original logic for backward compatibility
+            for (const [fieldName, value] of Object.entries(requestData)) {
+                const javaFieldName = this.generateJavaFieldName(fieldName);
+                const fieldType = this.getJavaTypeForValue(value, fieldName, className, "Request");
+                pojoContent += `        @JsonProperty(required = true)
+        private ${fieldType} ${javaFieldName};
+`;
+            }
+
+
+        pojoContent += `    }
+        `;
+
+        // Generate nested POJOs for complex fields
+        const nestedPOJOs = this.generateNestedPOJOs(requestData, className, "Request");
+        if (nestedPOJOs) {
+            pojoContent += `\n${nestedPOJOs}`;
+        }
+
+        return pojoContent;
+    }
+
     /**
      * Generate POJO class for response schema
      */
@@ -219,11 +262,11 @@ export class BDDCodeGenerator {
 
         const pojoClassName = `${className}ResponseData`;
         let pojoContent = `    // Response POJO for schema validation
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public static class ${pojoClassName} {
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ${pojoClassName} {
 `;
 
         // Generate fields based on detected schema
@@ -242,7 +285,7 @@ public static class ${pojoClassName} {
             // Use original logic for backward compatibility
             for (const [fieldName, value] of Object.entries(responseData)) {
                 const javaFieldName = this.generateJavaFieldName(fieldName);
-                const fieldType = this.getJavaTypeForValue(value, fieldName, className, false);
+                const fieldType = this.getJavaTypeForValue(value, fieldName, className);
                 pojoContent += `        @JsonProperty(required = true)
         private ${fieldType} ${javaFieldName};
 `;
@@ -252,7 +295,7 @@ public static class ${pojoClassName} {
         pojoContent += `    }`;
 
         // Generate nested POJOs for complex fields
-        const nestedPOJOs = this.generateNestedPOJOs(endpoint.actualResponse?.data, detectedSchema, className, false);
+        const nestedPOJOs = this.generateNestedPOJOs(endpoint.actualResponse?.data, className, "");
         if (nestedPOJOs) {
             pojoContent += `\n${nestedPOJOs}`;
         }
@@ -260,7 +303,7 @@ public static class ${pojoClassName} {
         return pojoContent;
     }
 
-    private getJavaTypeForValue(value: any, fieldName: string = '', className: string = '', errorClass: Boolean = false): string {
+    private getJavaTypeForValue(value: any, fieldName: string = '', className: string = '', classPrefix: string = ''): string {
         if (Array.isArray(value) && value.length > 0) {
             const firstItem = value[0];
             if (typeof firstItem === 'object' && firstItem !== null) {
@@ -272,7 +315,7 @@ public static class ${pojoClassName} {
         }
         if (typeof value === 'object' && value !== null) {
             // For complex objects, generate a class name based on field name and class
-            const objectClassName = this.generateObjectClassName(fieldName, className, errorClass);
+            const objectClassName = this.generateObjectClassName(fieldName, className, classPrefix);
             return objectClassName;
         }
         return this.getJavaType(typeof value);
@@ -286,45 +329,41 @@ public static class ${pojoClassName} {
         return `${className}${fieldPascalCase}`;
     }
 
-    private generateObjectClassName(fieldName: string, className: string, errorClass: Boolean): string {
+    private generateObjectClassName(fieldName: string, className: string, classPrefix: string): string {
 
-        let errClassName = errorClass === true ? 'Error' : '';
-        if (!fieldName) return `${errClassName + className}Data`;
+        if (!fieldName) return `${classPrefix + className}Data`;
 
         // Convert field name to PascalCase and append to class name
         const fieldPascalCase = this.sanitizeClassName(fieldName);
-        return `${errClassName + className}${fieldPascalCase}`;
+        return `${classPrefix + className}${fieldPascalCase}`;
     }
 
-    private generateNestedPOJOs(responseData: any, detectedSchema: any, className: string, errorClass: Boolean): string {
+    private generateNestedPOJOs(responseData: any, className: string, classPrefix: string): string {
 
         let nestedPOJOs = '';
-        let errClassName = errorClass === true ? 'Error' : '';
 
         // Dynamically generate nested POJOs based on the actual data structure
         const processedFields = new Set<string>();
 
         const generateNestedClass = (data: any, fieldName: string, className: string, depth: number = 0): string => {
 
-            // Condition Removed
-            // if (depth > 4) return ''; // Prevent infinite recursion
 
             const classKey = `${className}_${fieldName}`;
             if (processedFields.has(classKey)) return '';
             processedFields.add(classKey);
 
             let classContent = `
-    // ${className}${this.sanitizeClassName(fieldName)} structure
+    // ${classPrefix+className}${this.sanitizeClassName(fieldName)} structure
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ${errClassName + className}${this.sanitizeClassName(fieldName)} {`;
+    public static class ${classPrefix + className}${this.sanitizeClassName(fieldName)} {`;
 
             // Generate fields for this nested class
             Object.entries(data).forEach(([key, value]) => {
                 const javaFieldName = this.generateJavaFieldName(key);
-                const fieldType = this.getJavaTypeForValue(value, key, className, errorClass);
+                const fieldType = this.getJavaTypeForValue(value, key, className);
 
                 classContent += `
         @JsonProperty(required = true)
@@ -332,7 +371,8 @@ public static class ${pojoClassName} {
             });
 
             classContent += `
-    }`;
+    }
+            `;
 
             // Recursively generate nested classes for complex fields
             Object.entries(data).forEach(([key, value]) => {
@@ -408,7 +448,7 @@ public static class ${pojoClassName} {
             errorFields.forEach(field => {
 
                 const javaFieldName = this.generateJavaFieldName(field.name);
-                const fieldType = this.getJavaTypeForValue(field.value, field.name, className, true);
+                const fieldType = this.getJavaTypeForValue(field.value, field.name, className, "Error");
 
                 console.log("fieldTypeValue ::: " + fieldType);
                 errorPojoContent += `        @JsonProperty(required = true)
@@ -431,7 +471,7 @@ public static class ${pojoClassName} {
         errorPojoContent += `    }`;
 
         // Generate nested POJOs for complex fields
-        const nestedPOJOs = this.generateNestedPOJOs(JSON.parse(errorStructure), '', className, true);
+        const nestedPOJOs = this.generateNestedPOJOs(JSON.parse(errorStructure), className, "Error");
         if (nestedPOJOs) {
             errorPojoContent += `\n${nestedPOJOs}`;
         }
@@ -664,6 +704,13 @@ ${this.generateInvalidPayloadBuilder(endpoint)}
         const requiresBody = ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase());
         const embeddedRequestPOJO = (requiresBody && requestData) || endpoint.method.toUpperCase() !== 'GET' ?
             this.generateEmbeddedPOJOClass(requestClass, requestData, true, endpoint) : '';
+
+        console.log("Request Data :: " + JSON.stringify(requestData));
+
+        const requestSchemaPOJO = (requiresBody && requestData) || endpoint.method.toUpperCase() !== 'GET' ? 
+            this.generateRequestPOJO(requestData, className) : '';
+
+
         const embeddedResponsePOJO = responseData ?
             this.generateEmbeddedPOJOClass(responseClass, responseData, false, endpoint) : '';
 
@@ -846,6 +893,9 @@ ${endpoint.errorSchema?.enabled ? `
     // Embedded POJO Classes
 ${embeddedRequestPOJO}
 ${embeddedResponsePOJO}
+    // Request Response Error POJO Schema Classes
+    
+${requestSchemaPOJO}
 ${responseSchemaPOJO}
 ${errorSchemaPOJO}
 }`;
@@ -881,15 +931,15 @@ ${errorSchemaPOJO}
         if (fields.length === 0) return '';
 
         const lombokImports = this.config.useLombok ? `
-import lombok.Data;
-import lombok.Builder;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;` : '';
+    import lombok.Data;
+    import lombok.Builder;
+    import lombok.NoArgsConstructor;
+    import lombok.AllArgsConstructor;` : '';
 
         const lombokAnnotations = this.config.useLombok ?
-            `@Data${isRequest ? '\n@Builder' : ''}
-@NoArgsConstructor
-@AllArgsConstructor` : '';
+        `   @Data${isRequest ? '\n    @Builder' : ''}
+    @NoArgsConstructor
+    @AllArgsConstructor` : '';
 
         const fieldsCode = fields.map(field => {
             const fieldType = field.type || this.getJavaType(field.type);
@@ -911,7 +961,8 @@ import lombok.AllArgsConstructor;` : '';
         return `${lombokAnnotations}
     public static class ${className} {
 ${fieldsCode}${gettersSetters}
-    }`;
+    }
+`;
     }
 
     private generatePOJOs(endpoint: Endpoint, className: string) {
@@ -1581,7 +1632,7 @@ ${fieldsCode}${gettersSetters}
                 const arrayItems = value.map((item: any) => {
                     if (typeof item === "object") {
                         // Nested object inside array
-                        return `${indent}    ${this.capitalize(key)}Item.builder()\n${this.generateBuilderCalls(item, customizableFields, fullKey, indent + "        ")}\n${indent}    .build()`;
+                        return `${indent}    ${key}Item.builder()\n${this.generateBuilderCalls(item, customizableFields, fullKey, indent + "        ")}\n${indent}    .build()`;
                     } else {
                         return typeof item === "string" ? `"${item}"` : item;
                     }
@@ -1593,17 +1644,17 @@ ${fieldsCode}${gettersSetters}
             // Handle nested objects
             if (typeof value === "object" && value !== null) {
                 const nestedIndent = indent + "    ";
-                return `${indent}.${key}(${this.capitalize(key)}.builder()\n${this.generateBuilderCalls(value, customizableFields, fullKey, nestedIndent)}\n${indent}.build())`;
+                return `${indent}.${this.generateJavaFieldName(key)}(${this.generateJavaFieldName(key)}.builder()\n${this.generateBuilderCalls(value, customizableFields, fullKey, nestedIndent)}\n${indent}.build())`;
             }
 
             // Simple fields
             if (customizableFields.has(fullKey)) {
                 const paramName = fullKey.replace(/\./g, "_");
-                return `${indent}.${key}(${paramName})`;
+                return `${indent}.${this.generateJavaFieldName(key)}(${paramName})`;
             } else if (typeof value === "string") {
-                return `${indent}.${key}("${value}")`;
+                return `${indent}.${this.generateJavaFieldName(key)}("${value}")`;
             } else {
-                return `${indent}.${key}(${value})`;
+                return `${indent}.${this.generateJavaFieldName(key)}(${value})`;
             }
         }).join("\n");
     }
